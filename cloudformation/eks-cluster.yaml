@@ -213,7 +213,6 @@ Resources:
     Type: AWS::EKS::Nodegroup
     Properties:
       ClusterName: !Ref EKSCluster
-      NodeGroupName: !Sub ${ClusterName}-NodeGroup
       NodeRole: !GetAtt EKSNodeGroupRole.Arn
       ScalingConfig:
         MinSize: 1
