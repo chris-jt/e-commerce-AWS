@@ -104,11 +104,17 @@ jobs:
           --stack-name ${{ env.CLUSTER_NAME }} \
           --parameter-overrides ClusterName=${{ env.CLUSTER_NAME }} \
           --capabilities CAPABILITY_IAM
-          
+    - name: Verify EKS permissions
+      run: |
+        aws eks list-clusters --region ${{ env.AWS_REGION }}    
+    - name: Verify AWS identity
+      run: |
+        aws sts get-caller-identity 
+                 
     - name: Verify EKS cluster
       run: |
         aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
-        
+
     - name: Update kube config
       run: |
         aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
