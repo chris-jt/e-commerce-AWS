@@ -104,11 +104,15 @@ jobs:
           --stack-name ${{ env.CLUSTER_NAME }} \
           --parameter-overrides ClusterName=${{ env.CLUSTER_NAME }} \
           --capabilities CAPABILITY_IAM
-  
+          
+    - name: Verify EKS cluster
+      run: |
+        aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        
     - name: Update kube config
       run: |
-        aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} | kubectl apply -f -
-        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }}
+        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+        kubectl get svc
   
   deploy-to-eks:
     needs: [check-changes, build-and-push, deploy-infrastructure]
