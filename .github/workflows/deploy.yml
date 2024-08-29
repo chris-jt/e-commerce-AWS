@@ -153,7 +153,7 @@ jobs:
       
     - name: Apply Kubernetes configurations
       run: |
-        kubectl apply -f kubernetes/
+        kubectl apply -f k8s/
     
     - name: Deploy to EKS
       if: steps.check.outputs.should_run == 'true'
