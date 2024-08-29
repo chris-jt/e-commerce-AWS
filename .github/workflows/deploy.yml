@@ -110,7 +110,7 @@ jobs:
     - name: Verify AWS identity
       run: |
         aws sts get-caller-identity 
-                 
+
     - name: Verify EKS cluster
       run: |
         aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
@@ -149,7 +149,7 @@ jobs:
     
     - name: Configure kubectl
       run: |
-        aws eks --region us-east-1 update-kubeconfig --name m${{ env.CLUSTER_NAME }}
+        aws eks --region us-east-1 update-kubeconfig --name ${{ env.CLUSTER_NAME }}
       
     - name: Apply Kubernetes configurations
       run: |
