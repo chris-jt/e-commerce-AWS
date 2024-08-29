@@ -12,6 +12,7 @@ env:
   ECR_REPOSITORY: ${GITHUB_REPOSITORY}
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  CLUSTER_NAME: e-commerce-cluster
 
 jobs:
   check-changes:
@@ -100,14 +101,14 @@ jobs:
       run: |
         aws cloudformation deploy \
           --template-file cloudformation/eks-cluster.yaml \
-          --stack-name my-eks-cluster \
-          --parameter-overrides ClusterName=my-eks-cluster \
+          --stack-name ${{ env.CLUSTER_NAME }} \
+          --parameter-overrides ClusterName=${{ env.CLUSTER_NAME }} \
           --capabilities CAPABILITY_IAM
   
     - name: Update kube config
       run: |
-        aws eks get-token --cluster-name my-eks-cluster | kubectl apply -f -
-        aws eks update-kubeconfig --name my-eks-cluster
+        aws eks get-token --cluster-name ${{ env.CLUSTER_NAME }} | kubectl apply -f -
+        aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }}
   
   deploy-to-eks:
     needs: [check-changes, build-and-push, deploy-infrastructure]
@@ -136,9 +137,13 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
     
-    - name: Update kube config
-      if: steps.check.outputs.should_run == 'true'
-      run: aws eks get-token --cluster-name my-eks-cluster | kubectl apply -f -
+    - name: Configure kubectl
+      run: |
+        aws eks --region us-east-1 update-kubeconfig --name m${{ env.CLUSTER_NAME }}
+      
+    - name: Apply Kubernetes configurations
+      run: |
+        kubectl apply -f kubernetes/
     
     - name: Deploy to EKS
       if: steps.check.outputs.should_run == 'true'
