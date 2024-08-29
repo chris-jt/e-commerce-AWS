@@ -165,10 +165,10 @@ jobs:
       env:
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        sed -i 's|${DOCKER_USERNAME}|'${{ env.DOCKER_USERNAME }}'|g' k8s/${{ matrix.service }}-deployment.yaml
-        sed -i 's|${IMAGE_TAG}|'$IMAGE_TAG'|g' k8s/${{ matrix.service }}-deployment.yaml
-        sed -i 's|${SERVICE_NAME}|'${{ matrix.service }}'|g' k8s/${{ matrix.service }}-deployment.yaml
-        kubectl apply -f k8s/${{ matrix.service }}-deployment.yaml
+        sed -i 's|${DOCKER_USERNAME}|'${{ env.DOCKER_USERNAME }}'|g' k8s/${{ matrix.service }}.yaml
+        sed -i 's|${IMAGE_TAG}|'$IMAGE_TAG'|g' k8s/${{ matrix.service }}.yaml
+        sed -i 's|${SERVICE_NAME}|'${{ matrix.service }}'|g' k8s/${{ matrix.service }}.yaml
+        kubectl apply -f k8s/${{ matrix.service }}.yaml
 
   get-frontend-url:
     needs: deploy-to-eks
