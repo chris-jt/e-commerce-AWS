@@ -153,7 +153,12 @@ jobs:
       
     - name: Apply Kubernetes configurations
       run: |
-        kubectl apply -f k8s/
+        for file in k8s/*.yaml
+        do
+          sed -e 's|${DOCKER_USERNAME}|'"${{ env.DOCKER_USERNAME }}"'|g' \
+              -e 's|${IMAGE_TAG}|'"${{ github.sha }}"'|g' \
+              -e 's|${SERVICE_NAME}|'"$(basename "$file" .yaml)"'|g' "$file" | kubectl apply -f -
+        done
     
     - name: Deploy to EKS
       if: steps.check.outputs.should_run == 'true'
