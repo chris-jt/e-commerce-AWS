@@ -1,0 +1,47 @@
+name: Delete EKS Cluster and Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_delete:
+        description: 'Type "DELETE" to confirm the deletion of the entire infrastructure'
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  delete-infrastructure:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm_delete == 'DELETE'
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Delete EKS Cluster and VPC
+      run: |
+        # Delete the EKS cluster
+        aws eks delete-cluster --name my-eks-cluster
+
+        # Wait for the cluster to be deleted
+        aws eks wait cluster-deleted --name my-eks-cluster
+
+        # Delete the CloudFormation stack
+        aws cloudformation delete-stack --stack-name my-eks-cluster
+
+        # Wait for the stack to be deleted
+        aws cloudformation wait stack-delete-complete --stack-name my-eks-cluster
+
+    - name: Clean up resources
+      run: |
+        # Delete any leftover ELBs
+        for lb in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[*].LoadBalancerName' --output text); do
+          aws elb delete-load-balancer --load-balancer-name $lb
+        done
+
+        # Delete any leftover EBS volumes
+        for vol in $(aws ec2 describe-volumes --filters Name=status,Values=available

@@ -1,0 +1,145 @@
+name: Deploy to EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_delete:
+        description: 'Type "DEPLOY" to confirm the deploy of the infrastructure'
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ${GITHUB_REPOSITORY}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      merchandise: ${{ steps.filter.outputs.merchandise }}
+      products: ${{ steps.filter.outputs.products }}
+      shopping-cart: ${{ steps.filter.outputs.shopping-cart }}
+      infrastructure: ${{ steps.filter.outputs.infrastructure }}
+    steps:
+    - uses: actions/checkout@v2
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        filters: |
+          frontend:
+            - 'frontend/**'
+          merchandise:
+            - 'merchandise/**'
+          products:
+            - 'products/**'
+          shopping-cart:
+            - 'shopping-cart/**'
+          infrastructure:
+            - 'cloudformation/**'
+            - '.github/workflows/**'
+
+  build-and-push:
+    needs: check-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, merchandise, products, shopping-cart]
+    if: needs.check-changes.outputs[matrix.service] == 'true'
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build, tag, and push image to DockerHub
+      env:
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:$IMAGE_TAG ./${{ matrix.service }}
+        docker push ${{ env.DOCKER_USERNAME }}/${{ matrix.service }}:$IMAGE_TAG
+
+  deploy-infrastructure:
+    
+    needs: check-changes
+    if: needs.check-changes.outputs.infrastructure == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+  
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+  
+    - name: Deploy EKS cluster
+      run: |
+        aws cloudformation deploy \
+          --template-file cloudformation/eks-cluster.yaml \
+          --stack-name my-eks-cluster \
+          --parameter-overrides ClusterName=my-eks-cluster \
+          --capabilities CAPABILITY_IAM
+  
+    - name: Update kube config
+      run: |
+        aws eks get-token --cluster-name my-eks-cluster | kubectl apply -f -
+        aws eks update-kubeconfig --name my-eks-cluster
+  
+  deploy-to-eks:
+    needs: [check-changes, build-and-push, deploy-infrastructure]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [frontend, merchandise, products, shopping-cart]
+    if: needs.check-changes.outputs[matrix.service] == 'true'
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Update kube config
+      run: aws eks get-token --cluster-name my-eks-cluster | kubectl apply -f -
+    
+    - name: Deploy to EKS
+      env:
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        sed -i 's|${DOCKER_USERNAME}|'${{ env.DOCKER_USERNAME }}'|g' k8s/${{ matrix.service }}-deployment.yaml
+        sed -i 's|${IMAGE_TAG}|'$IMAGE_TAG'|g' k8s/${{ matrix.service }}-deployment.yaml
+        sed -i 's|${SERVICE_NAME}|'${{ matrix.service }}'|g' k8s/${{ matrix.service }}-deployment.yaml
+        kubectl apply -f k8s/${{ matrix.service }}-deployment.yaml
+
+  get-frontend-url:
+    needs: deploy-to-eks
+    runs-on: ubuntu-latest
+    if: needs.check-changes.outputs.frontend == 'true'
+    steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Get Frontend URL
+      run: |
+        FRONTEND_URL=$(kubectl get service frontend -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "Frontend is accessible at: http://$FRONTEND_URL"
