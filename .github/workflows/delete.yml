@@ -24,16 +24,30 @@ jobs:
 
     - name: Delete EKS Cluster and VPC
       run: |
+        # Get the list of nodegroups
+        NODEGROUPS=$(aws eks list-nodegroups --cluster-name my-eks-cluster --query 'nodegroups[*]' --output text)
+
+        # Delete each nodegroup
+        for ng in $NODEGROUPS; do
+          echo "Deleting nodegroup $ng"
+          aws eks delete-nodegroup --cluster-name my-eks-cluster --nodegroup-name $ng
+          aws eks wait nodegroup-deleted --cluster-name my-eks-cluster --nodegroup-name $ng
+        done
+
         # Delete the EKS cluster
+        echo "Deleting EKS cluster"
         aws eks delete-cluster --name my-eks-cluster
 
         # Wait for the cluster to be deleted
+        echo "Waiting for cluster deletion"
         aws eks wait cluster-deleted --name my-eks-cluster
 
         # Delete the CloudFormation stack
+        echo "Deleting CloudFormation stack"
         aws cloudformation delete-stack --stack-name my-eks-cluster
 
         # Wait for the stack to be deleted
+        echo "Waiting for stack deletion"
         aws cloudformation wait stack-delete-complete --stack-name my-eks-cluster
 
     - name: Clean up resources
@@ -44,4 +58,6 @@ jobs:
         done
 
         # Delete any leftover EBS volumes
-        for vol in $(aws ec2 describe-volumes --filters Name=status,Values=available
+        for vol in $(aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes[*].VolumeId' --output text); do
+          aws ec2 delete-volume --volume-id $vol
+        done
