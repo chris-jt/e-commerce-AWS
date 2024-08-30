@@ -2,7 +2,7 @@
 <html>
     <head>
         <title>Challenge DevOps 2023</title>
-        <meta name="author" content="Rossana Suarez @roxsross" />
+        <meta name="author" content="Christian Tronconi" />
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
@@ -95,8 +95,8 @@
     </div>
 
     <footer class="w3-center w3-black w3-padding-48 w3-xxlarge">
-    <p>Bootcamp DevOps</p>
-    <a class="w3-button w3-round-xxlarge w3-dark-grey w3-margin-bottom" href="#" target="_blank">byRoxsRoss</a>
+    <p>Curso DevOps</p>
+    <a class="w3-button w3-round-xxlarge w3-dark-grey w3-margin-bottom" href="#" target="_blank">byChristian</a>
     </footer>
 
     <script>
@@ -105,8 +105,7 @@
             if (document.getElementsByClassName('product').length != 0) {
                 return
             }
-        
-            // window.location.href will be the IP or DNS name of EC2 instance, K8s worker node or app LoadBalancer
+                 
             const response = await fetch(`${window.location.href}get-products`);
             console.log("response", response);
             const jsonData = await response.json();
@@ -173,8 +172,7 @@
             if (document.getElementsByClassName('merchandise').length != 0) {
                 return
             }
-        
-            // window.location.href will be the IP or DNS name of EC2 instance, K8s worker node or app LoadBalancer
+                   
             const response = await fetch(`${window.location.href}get-merchandise`);
             console.log("response", response);
             const jsonData = await response.json();
