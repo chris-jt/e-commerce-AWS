@@ -23,6 +23,38 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    - name: Clean up resources
+      run: |
+        # Delete any ALBs and NLBs
+        for lb in $(aws elbv2 describe-load-balancers --query 'LoadBalancers[*].LoadBalancerArn' --output text); do
+          echo "Deleting load balancer $lb"
+          aws elbv2 delete-load-balancer --load-balancer-arn $lb
+        done
+
+        # Delete any Classic ELBs
+        for lb in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[*].LoadBalancerName' --output text); do
+          echo "Deleting classic load balancer $lb"
+          aws elb delete-load-balancer --load-balancer-name $lb
+        done
+
+        # Delete any NAT Gateways
+        for nat in $(aws ec2 describe-nat-gateways --query 'NatGateways[*].NatGatewayId' --output text); do
+          echo "Deleting NAT Gateway $nat"
+          aws ec2 delete-nat-gateway --nat-gateway-id $nat
+        done
+
+        # Release any Elastic IPs
+        for eip in $(aws ec2 describe-addresses --query 'Addresses[*].AllocationId' --output text); do
+          echo "Releasing Elastic IP $eip"
+          aws ec2 release-address --allocation-id $eip
+        done
+
+        # Delete any security groups (except default)
+        for sg in $(aws ec2 describe-security-groups --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do
+          echo "Deleting security group $sg"
+          aws ec2 delete-security-group --group-id $sg
+        done
+
     - name: Delete EKS Cluster and VPC
       run: |
         # Get the list of nodegroups
@@ -51,14 +83,24 @@ jobs:
         echo "Waiting for stack deletion"
         aws cloudformation wait stack-delete-complete --stack-name ${{ env.CLUSTER_NAME }}
 
-    - name: Clean up resources
+    - name: Final cleanup
       run: |
-        # Delete any leftover ELBs
-        for lb in $(aws elb describe-load-balancers --query 'LoadBalancerDescriptions[*].LoadBalancerName' --output text); do
-          aws elb delete-load-balancer --load-balancer-name $lb
-        done
-
         # Delete any leftover EBS volumes
         for vol in $(aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes[*].VolumeId' --output text); do
+          echo "Deleting EBS volume $vol"
           aws ec2 delete-volume --volume-id $vol
+        done
+
+        # Delete any VPC endpoints
+        for vpc in $(aws ec2 describe-vpcs --query 'Vpcs[*].VpcId' --output text); do
+          for endpoint in $(aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=$vpc --query 'VpcEndpoints[*].VpcEndpointId' --output text); do
+            echo "Deleting VPC endpoint $endpoint"
+            aws ec2 delete-vpc-endpoints --vpc-endpoint-ids $endpoint
+          done
+        done
+
+        # Delete any VPC peering connections
+        for peering in $(aws ec2 describe-vpc-peering-connections --query 'VpcPeeringConnections[*].VpcPeeringConnectionId' --output text); do
+          echo "Deleting VPC peering connection $peering"
+          aws ec2 delete-vpc-peering-connection --vpc-peering-connection-id $peering
         done
