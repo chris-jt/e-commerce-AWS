@@ -9,6 +9,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  CLUSTER_NAME: e-commerce-cluster
 
 jobs:
   delete-infrastructure:
@@ -25,30 +26,30 @@ jobs:
     - name: Delete EKS Cluster and VPC
       run: |
         # Get the list of nodegroups
-        NODEGROUPS=$(aws eks list-nodegroups --cluster-name my-eks-cluster --query 'nodegroups[*]' --output text)
+        NODEGROUPS=$(aws eks list-nodegroups --cluster-name ${{ env.CLUSTER_NAME }} --query 'nodegroups[*]' --output text)
 
         # Delete each nodegroup
         for ng in $NODEGROUPS; do
           echo "Deleting nodegroup $ng"
-          aws eks delete-nodegroup --cluster-name my-eks-cluster --nodegroup-name $ng
-          aws eks wait nodegroup-deleted --cluster-name my-eks-cluster --nodegroup-name $ng
+          aws eks delete-nodegroup --cluster-name ${{ env.CLUSTER_NAME }} --nodegroup-name $ng
+          aws eks wait nodegroup-deleted --cluster-name ${{ env.CLUSTER_NAME }} --nodegroup-name $ng
         done
 
         # Delete the EKS cluster
         echo "Deleting EKS cluster"
-        aws eks delete-cluster --name my-eks-cluster
+        aws eks delete-cluster --name ${{ env.CLUSTER_NAME }}
 
         # Wait for the cluster to be deleted
         echo "Waiting for cluster deletion"
-        aws eks wait cluster-deleted --name my-eks-cluster
+        aws eks wait cluster-deleted --name ${{ env.CLUSTER_NAME }}
 
         # Delete the CloudFormation stack
         echo "Deleting CloudFormation stack"
-        aws cloudformation delete-stack --stack-name my-eks-cluster
+        aws cloudformation delete-stack --stack-name ${{ env.CLUSTER_NAME }}
 
         # Wait for the stack to be deleted
         echo "Waiting for stack deletion"
-        aws cloudformation wait stack-delete-complete --stack-name my-eks-cluster
+        aws cloudformation wait stack-delete-complete --stack-name ${{ env.CLUSTER_NAME }}
 
     - name: Clean up resources
       run: |
